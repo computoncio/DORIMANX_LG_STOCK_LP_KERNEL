@@ -35,7 +35,7 @@
 #include <linux/mmc/mmc.h>
 #include <linux/pm.h>
 #include <linux/pm_runtime.h>
-#include <linux/mmc/cd-gpio.h>
+#include <linux/mmc/slot-gpio.h>
 #include <linux/dma-mapping.h>
 #include <mach/gpio.h>
 #include <mach/msm_bus.h>

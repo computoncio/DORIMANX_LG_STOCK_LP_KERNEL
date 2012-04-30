@@ -12,8 +12,8 @@
 #include <linux/gpio.h>
 #include <linux/interrupt.h>
 #include <linux/jiffies.h>
-#include <linux/mmc/cd-gpio.h>
 #include <linux/mmc/host.h>
+#include <linux/mmc/slot-gpio.h>
 #include <linux/module.h>
 #include <linux/slab.h>
 
@@ -21,10 +21,10 @@
 #include <linux/mmc/debug_log.h>
 #endif
 
-struct mmc_cd_gpio {
-	unsigned int gpio;
+struct mmc_gpio {
+	unsigned int cd_gpio;
 	bool status;
-	char label[0];
+	char cd_label[0];
 };
 
 #ifdef CONFIG_MACH_LGE
@@ -38,33 +38,33 @@ static int mmc_cd_get_status(struct mmc_host *host)
 #endif
 {
 	int ret = -ENOSYS;
-	struct mmc_cd_gpio *cd = host->hotplug.handler_priv;
+	struct mmc_gpio *ctx = host->hotplug.handler_priv;
 
-	if (!cd || !gpio_is_valid(cd->gpio))
+	if (!ctx || !gpio_is_valid(ctx->cd_gpio))
 		goto out;
 
-	ret = !gpio_get_value_cansleep(cd->gpio) ^
+	ret = !gpio_get_value_cansleep(ctx->cd_gpio) ^
 		!!(host->caps2 & MMC_CAP2_CD_ACTIVE_HIGH);
 out:
 	return ret;
 }
 
-static irqreturn_t mmc_cd_gpio_irqt(int irq, void *dev_id)
+static irqreturn_t mmc_gpio_cd_irqt(int irq, void *dev_id)
 {
 	struct mmc_host *host = dev_id;
-	struct mmc_cd_gpio *cd = host->hotplug.handler_priv;
+	struct mmc_gpio *ctx = host->hotplug.handler_priv;
 	int status;
 
 	status = mmc_cd_get_status(host);
 	if (unlikely(status < 0))
 		goto out;
 
-	if (status ^ cd->status) {
+	if (status ^ ctx->status) {
 		pr_info("%s: slot status change detected (%d -> %d), GPIO_ACTIVE_%s\n",
-				mmc_hostname(host), cd->status, status,
+				mmc_hostname(host), ctx->status, status,
 				(host->caps2 & MMC_CAP2_CD_ACTIVE_HIGH) ?
 				"HIGH" : "LOW");
-		cd->status = status;
+		ctx->status = status;
 
 		/* Schedule a card detection after a debounce timeout */
 		#ifdef CONFIG_MACH_LGE
@@ -81,62 +81,62 @@ out:
 	return IRQ_HANDLED;
 }
 
-int mmc_cd_gpio_request(struct mmc_host *host, unsigned int gpio)
+int mmc_gpio_request_cd(struct mmc_host *host, unsigned int gpio)
 {
 	size_t len = strlen(dev_name(host->parent)) + 4;
-	struct mmc_cd_gpio *cd;
+	struct mmc_gpio *ctx;
 	int irq = gpio_to_irq(gpio);
 	int ret;
 
 	if (irq < 0)
 		return irq;
 
-	cd = kmalloc(sizeof(*cd) + len, GFP_KERNEL);
-	if (!cd)
+	ctx = kmalloc(sizeof(*ctx) + len, GFP_KERNEL);
+	if (!ctx)
 		return -ENOMEM;
 
-	snprintf(cd->label, len, "%s cd", dev_name(host->parent));
+	snprintf(ctx->cd_label, len, "%s cd", dev_name(host->parent));
 
-	ret = gpio_request_one(gpio, GPIOF_DIR_IN, cd->label);
+	ret = gpio_request_one(gpio, GPIOF_DIR_IN, ctx->cd_label);
 	if (ret < 0)
 		goto egpioreq;
-
-	cd->gpio = gpio;
-	host->hotplug.irq = irq;
-	host->hotplug.handler_priv = cd;
 
 	ret = mmc_cd_get_status(host);
 	if (ret < 0)
 		goto eirqreq;
 
-	cd->status = ret;
+	ctx->status = ret;
 
-	ret = request_threaded_irq(irq, NULL, mmc_cd_gpio_irqt,
-				   IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING |
-				   IRQF_ONESHOT, cd->label, host);
+	ret = request_threaded_irq(irq, NULL, mmc_gpio_cd_irqt,
+			IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
+			ctx->cd_label, host);
 	if (ret < 0)
 		goto eirqreq;
+
+	ctx->cd_gpio = gpio;
+	host->hotplug.irq = irq;
+	host->hotplug.handler_priv = ctx;
 
 	return 0;
 
 eirqreq:
 	gpio_free(gpio);
 egpioreq:
-	kfree(cd);
+	kfree(ctx);
 	return ret;
 }
-EXPORT_SYMBOL(mmc_cd_gpio_request);
+EXPORT_SYMBOL(mmc_gpio_request_cd);
 
-void mmc_cd_gpio_free(struct mmc_host *host)
+void mmc_gpio_free_cd(struct mmc_host *host)
 {
-	struct mmc_cd_gpio *cd = host->hotplug.handler_priv;
+	struct mmc_gpio *ctx = host->hotplug.handler_priv;
 
-	if (!cd || !gpio_is_valid(cd->gpio))
+	if (!ctx || !gpio_is_valid(ctx->cd_gpio))
 		return;
 
 	free_irq(host->hotplug.irq, host);
-	gpio_free(cd->gpio);
-	cd->gpio = -EINVAL;
-	kfree(cd);
+	gpio_free(ctx->cd_gpio);
+	ctx->cd_gpio = -EINVAL;
+	kfree(ctx);
 }
-EXPORT_SYMBOL(mmc_cd_gpio_free);
+EXPORT_SYMBOL(mmc_gpio_free_cd);
