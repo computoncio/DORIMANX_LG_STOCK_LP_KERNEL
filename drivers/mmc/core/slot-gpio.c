@@ -81,6 +81,34 @@ out:
 	return IRQ_HANDLED;
 }
 
+static int mmc_gpio_alloc(struct mmc_host *host)
+{
+	size_t len = strlen(dev_name(host->parent)) + 4;
+	struct mmc_gpio *ctx;
+
+	mutex_lock(&host->slot.lock);
+
+	ctx = host->slot.handler_priv;
+	if (!ctx) {
+		/*
+		 * devm_kzalloc() can be called after device_initialize(), even
+		 * before device_add(), i.e., between mmc_alloc_host() and
+		 * mmc_add_host()
+		 */
+		ctx = devm_kzalloc(&host->class_dev, sizeof(*ctx) + len,
+				   GFP_KERNEL);
+		if (ctx) {
+			snprintf(ctx->cd_label, len, "%s cd", dev_name(host->parent));
+			ctx->cd_gpio = -EINVAL;
+			host->slot.handler_priv = ctx;
+		}
+	}
+
+	mutex_unlock(&host->slot.lock);
+
+	return ctx ? 0 : -ENOMEM;
+}
+
 int mmc_gpio_get_cd(struct mmc_host *host)
 {
 	struct mmc_gpio *ctx = host->slot.handler_priv;
@@ -95,20 +123,24 @@ EXPORT_SYMBOL(mmc_gpio_get_cd);
 
 int mmc_gpio_request_cd(struct mmc_host *host, unsigned int gpio)
 {
-	size_t len = strlen(dev_name(host->parent)) + 4;
 	struct mmc_gpio *ctx;
 	int irq = gpio_to_irq(gpio);
 	int ret;
 
-	ctx = kmalloc(sizeof(*ctx) + len, GFP_KERNEL);
-	if (!ctx)
-		return -ENOMEM;
+	ret = mmc_gpio_alloc(host);
+	if (ret < 0)
+		return ret;
 
-	snprintf(ctx->cd_label, len, "%s cd", dev_name(host->parent));
+	ctx = host->slot.handler_priv;
 
 	ret = gpio_request_one(gpio, GPIOF_DIR_IN, ctx->cd_label);
 	if (ret < 0)
-		goto egpioreq;
+		/*
+		 * don't bother freeing memory. It might still get used by other
+		 * slot functions, in any case it will be freed, when the device
+		 * is destroyed.
+		 */
+		return ret;
 
 	ret = mmc_cd_get_status(host);
 	if (ret < 0)
@@ -138,13 +170,8 @@ int mmc_gpio_request_cd(struct mmc_host *host, unsigned int gpio)
 		host->caps |= MMC_CAP_NEEDS_POLL;
 
 	ctx->cd_gpio = gpio;
-	host->slot.handler_priv = ctx;
 
 	return 0;
-
-egpioreq:
-	kfree(ctx);
-	return ret;
 }
 EXPORT_SYMBOL(mmc_gpio_request_cd);
 
@@ -165,7 +192,5 @@ void mmc_gpio_free_cd(struct mmc_host *host)
 	ctx->cd_gpio = -EINVAL;
 
 	gpio_free(gpio);
-	host->slot.handler_priv = NULL;
-	kfree(ctx);
 }
 EXPORT_SYMBOL(mmc_gpio_free_cd);
