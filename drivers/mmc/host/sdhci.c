@@ -3572,7 +3572,8 @@ int sdhci_add_host(struct sdhci_host *host)
 	if (IS_ERR(host->vmmc)) {
 		pr_info("%s: no vmmc regulator found\n", mmc_hostname(mmc));
 		host->vmmc = NULL;
-	}
+	} else
+		regulator_enable(host->vmmc);
 
 #ifdef CONFIG_REGULATOR
 	if (host->vmmc) {
@@ -3857,8 +3858,10 @@ void sdhci_remove_host(struct sdhci_host *host, int dead)
 	tasklet_kill(&host->card_tasklet);
 	tasklet_kill(&host->finish_tasklet);
 
-	if (host->vmmc)
+	if (host->vmmc) {
+		regulator_disable(host->vmmc);
 		regulator_put(host->vmmc);
+	}
 
 	if (host->vqmmc) {
 		regulator_disable(host->vqmmc);
