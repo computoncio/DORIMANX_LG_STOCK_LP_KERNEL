@@ -1833,7 +1833,8 @@ int mmc_regulator_set_ocr(struct mmc_host *mmc,
 		int		tmp;
 		int		voltage;
 
-		/* REVISIT mmc_vddrange_to_ocrmask() may have set some
+		/*
+		 * REVISIT mmc_vddrange_to_ocrmask() may have set some
 		 * bits this regulator doesn't quite support ... don't
 		 * be too picky, most cards and regulators are OK with
 		 * a 0.1V range goof (it's a small error percentage).
@@ -1847,12 +1848,13 @@ int mmc_regulator_set_ocr(struct mmc_host *mmc,
 			max_uV = min_uV + 100 * 1000;
 		}
 
-		/* avoid needless changes to this voltage; the regulator
-		 * might not allow this operation
+		/*
+		 * If we're using a fixed/static regulator, don't call
+		 * regulator_set_voltage; it would fail.
 		 */
 		voltage = regulator_get_voltage(supply);
 
-		if (mmc->caps2 & MMC_CAP2_BROKEN_VOLTAGE)
+		if (regulator_count_voltages(supply) == 1)
 			min_uV = max_uV = voltage;
 
 		if (voltage < 0)
