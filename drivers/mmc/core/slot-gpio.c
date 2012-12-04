@@ -69,6 +69,11 @@ static irqreturn_t mmc_gpio_cd_irqt(int irq, void *dev_id)
 		ctx->status = status;
 
 		/* Schedule a card detection after a debounce timeout */
+		struct mmc_host *host = dev_id;
+
+		if (host->ops->card_event)
+			host->ops->card_event(host);
+
 		#ifdef CONFIG_MACH_LGE
 		/* LGE_CHANGE
 		 * Reduce debounce time to make it more sensitive
@@ -76,7 +81,7 @@ static irqreturn_t mmc_gpio_cd_irqt(int irq, void *dev_id)
 		 */
 		mmc_detect_change(host, 0);
 		#else
-		mmc_detect_change(host, msecs_to_jiffies(100));
+		mmc_detect_change(host, msecs_to_jiffies(200));
 		#endif
 	}
 out:
