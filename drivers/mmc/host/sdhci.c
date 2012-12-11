@@ -1531,7 +1531,7 @@ static bool sdhci_check_state(struct sdhci_host *host)
 static void sdhci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 {
 	struct sdhci_host *host;
-	bool present;
+	int present;
 	unsigned long flags;
 	u32 tuning_opcode;
 
@@ -1570,26 +1570,36 @@ static void sdhci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 
 	host->mrq = mrq;
 
-	/* If polling, assume that the card is always present. */
-	if (host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION)
+	/*
+	 * Firstly check card presence from cd-gpio.  The return could
+	 * be one of the following possibilities:
+	 *     negative: cd-gpio is not available
+	 *     zero: cd-gpio is used, and card is removed
+	 *     one: cd-gpio is used, and card is present
+	 */
+	present = mmc_gpio_get_cd(host->mmc);
+	if (present < 0) {
+		/* If polling, assume that the card is always present. */
+		if (host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION)
 #ifdef CONFIG_MACH_LGE
-	/* LGE_CHANGE
-	 * When sd doesn't exist physically, do finish tasklet-schedule.
-	 * Below checking is hard-coding, we have to consider 'mmc->index'.
-	 * 2014-03-17, B2-BSP-FS@lge.com
-	*/
-	{
-		if (mmc->index == MMC_HOST_DRIVER_INDEX_MMC1)
-			present = mmc_cd_get_status(mmc);
-		else
-			present = true;
-	}
+		/* LGE_CHANGE
+		 * When sd doesn't exist physically, do finish tasklet-schedule.
+		 * Below checking is hard-coding, we have to consider 'mmc->index'.
+		 * 2014-03-17, B2-BSP-FS@lge.com
+		 */
+		{
+			if (mmc->index == MMC_HOST_DRIVER_INDEX_MMC1)
+				present = mmc_cd_get_status(mmc);
+			else
+				present = 1;
+		}
 #else
-		present = true;
+			present = 1;
 #endif
-	else
-		present = sdhci_readl(host, SDHCI_PRESENT_STATE) &
-				SDHCI_CARD_PRESENT;
+		else
+			present = sdhci_readl(host, SDHCI_PRESENT_STATE) &
+					SDHCI_CARD_PRESENT;
+	}
 
 	if (!present || host->flags & SDHCI_DEVICE_DEAD) {
 		host->mrq->cmd->error = -ENOMEDIUM;
