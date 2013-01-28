@@ -1126,7 +1126,7 @@ static int mmc_select_driver_type(struct mmc_card *card)
  */
 static int mmc_select_hs200(struct mmc_card *card, u8 *ext_csd)
 {
-	int err = -EINVAL;
+	int err = 0;
 	struct mmc_host *host;
 
 	host = card->host;
