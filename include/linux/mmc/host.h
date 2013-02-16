@@ -499,6 +499,7 @@ extern bool mmc_host_may_gate_card(struct mmc_card *);
 extern int mmc_add_host(struct mmc_host *);
 extern void mmc_remove_host(struct mmc_host *);
 extern void mmc_free_host(struct mmc_host *);
+void mmc_of_parse(struct mmc_host *host);
 
 #ifdef CONFIG_MMC_EMBEDDED_SDIO
 extern void mmc_set_embedded_sdio_data(struct mmc_host *host,
