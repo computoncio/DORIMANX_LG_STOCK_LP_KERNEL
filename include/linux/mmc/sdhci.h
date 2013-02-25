@@ -114,6 +114,8 @@ struct sdhci_host {
  * be called twice.
  */
 #define SDHCI_QUIRK2_SLOW_INT_CLR			(1<<5)
+/* Ignore CMD CRC errors for tuning commands */
+#define SDHCI_QUIRK2_IGNORE_CMDCRC_FOR_TUNING		(1<<6)
 /*
  * If the base clock can be scalable, then there should be no further
  * clock dividing as the input clock itself will be scaled down to
