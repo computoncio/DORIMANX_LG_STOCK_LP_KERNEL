@@ -343,6 +343,8 @@ struct mmc_host {
 #define MMC_CAP2_CORE_PM	(1 << 23)       /* use PM framework */
 #define MMC_CAP2_HS400		(MMC_CAP2_HS400_1_8V | \
 				 MMC_CAP2_HS400_1_2V)
+#define MMC_CAP2_NO_PRESCAN_POWERUP (1 << 24)	/* Don't power up before scan */
+
 	mmc_pm_flag_t		pm_caps;	/* supported pm features */
 
 	int			clk_requests;	/* internal reference counter */
