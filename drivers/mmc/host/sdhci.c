@@ -1601,27 +1601,6 @@ static void sdhci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 		return;
 	}
 
-	spin_lock_irqsave(&host->lock, flags);
-
-	WARN_ON(host->mrq != NULL);
-
-#ifndef SDHCI_USE_LEDS_CLASS
-	sdhci_activate_led(host);
-#endif
-
-	/*
-	 * Ensure we don't send the STOP for non-SET_BLOCK_COUNTED
-	 * requests if Auto-CMD12 is enabled.
-	 */
-	if (!mrq->sbc && (host->flags & SDHCI_AUTO_CMD12)) {
-		if (mrq->stop) {
-			mrq->data->stop = NULL;
-			mrq->stop = NULL;
-		}
-	}
-
-	host->mrq = mrq;
-
 	/*
 	 * Firstly check card presence from cd-gpio.  The return could
 	 * be one of the following possibilities:
@@ -1652,6 +1631,27 @@ static void sdhci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 			present = sdhci_readl(host, SDHCI_PRESENT_STATE) &
 					SDHCI_CARD_PRESENT;
 	}
+
+	spin_lock_irqsave(&host->lock, flags);
+
+	WARN_ON(host->mrq != NULL);
+
+#ifndef SDHCI_USE_LEDS_CLASS
+	sdhci_activate_led(host);
+#endif
+
+	/*
+	 * Ensure we don't send the STOP for non-SET_BLOCK_COUNTED
+	 * requests if Auto-CMD12 is enabled.
+	 */
+	if (!mrq->sbc && (host->flags & SDHCI_AUTO_CMD12)) {
+		if (mrq->stop) {
+			mrq->data->stop = NULL;
+			mrq->stop = NULL;
+		}
+	}
+
+	host->mrq = mrq;
 
 	/* If we're using a cd-gpio, testing the presence bit might fail. */
 	if (!present) {
