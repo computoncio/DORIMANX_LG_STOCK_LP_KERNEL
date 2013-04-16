@@ -2040,9 +2040,6 @@ void mmc_power_up(struct mmc_host *host)
 	host->ios.timing = MMC_TIMING_LEGACY;
 	mmc_set_ios(host);
 
-	/* Set signal voltage to 3.3V */
-	__mmc_set_signal_voltage(host, MMC_SIGNAL_VOLTAGE_330);
-
 	/*
 	 * This delay should be sufficient to allow the power supply
 	 * to reach the minimum voltage.
@@ -2075,6 +2072,9 @@ void mmc_power_up(struct mmc_host *host)
 #else
 	mmc_delay(10);
 #endif
+
+	/* Set signal voltage to 3.3V */
+	__mmc_set_signal_voltage(host, MMC_SIGNAL_VOLTAGE_330);
 
 	mmc_host_clk_release(host);
 }
