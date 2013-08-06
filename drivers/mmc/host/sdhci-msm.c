@@ -64,6 +64,9 @@ enum sdc_mpm_pin_state {
 #define HC_MODE_EN		0x1
 #define FF_CLK_SW_RST_DIS	(1 << 13)
 
+#define CORE_GENERICS		0x70
+#define SWITCHABLE_SIGNALLING_VOL (1 << 29)
+
 #define CORE_POWER		0x0
 #define CORE_SW_RST		(1 << 7)
 
@@ -2316,6 +2319,7 @@ static void sdhci_msm_check_power_status(struct sdhci_host *host, u32 req_type)
 	struct sdhci_msm_host *msm_host = pltfm_host->priv;
 	unsigned long flags;
 	bool done = false;
+	u32 io_sig_sts;
 
 #ifdef CONFIG_LGE_MMC_SD_USE_SDCC3
 /* LGE_CHANGE
@@ -2339,6 +2343,29 @@ static void sdhci_msm_check_power_status(struct sdhci_host *host, u32 req_type)
 	pr_debug("%s: %s: request %d curr_pwr_state %x curr_io_level %x\n",
 			mmc_hostname(host->mmc), __func__, req_type,
 			msm_host->curr_pwr_state, msm_host->curr_io_level);
+	io_sig_sts = readl_relaxed(msm_host->core_mem + CORE_GENERICS);
+	/*
+	 * The IRQ for request type IO High/Low will be generated when -
+	 * 1. SWITCHABLE_SIGNALLING_VOL is enabled in HW.
+	 * 2. If 1 is true and when there is a state change in 1.8V enable
+	 * bit (bit 3) of SDHCI_HOST_CONTROL2 register. The reset state of
+	 * that bit is 0 which indicates 3.3V IO voltage. So, when MMC core
+	 * layer tries to set it to 3.3V before card detection happens, the
+	 * IRQ doesn't get triggered as there is no state change in this bit.
+	 * The driver already handles this case by changing the IO voltage
+	 * level to high as part of controller power up sequence. Hence, check
+	 * for host->pwr to handle a case where IO voltage high request is
+	 * issued even before controller power up.
+	 */
+	if (req_type & (REQ_IO_HIGH | REQ_IO_LOW)) {
+		if (!(io_sig_sts & SWITCHABLE_SIGNALLING_VOL) ||
+				((req_type & REQ_IO_HIGH) && !host->pwr)) {
+			pr_debug("%s: do not wait for power IRQ that never comes\n",
+					mmc_hostname(host->mmc));
+			spin_unlock_irqrestore(&host->lock, flags);
+			return;
+		}
+	}
 
 	if ((req_type & msm_host->curr_pwr_state) ||
 			(req_type & msm_host->curr_io_level))
