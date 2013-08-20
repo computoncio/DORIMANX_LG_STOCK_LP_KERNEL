@@ -475,6 +475,11 @@ struct mmc_host {
 	} clk_scaling;
 	enum dev_state dev_status;
 	bool			wakeup_on_idle;
+	/*
+	 * Set to 1 to just stop the SDCLK to the card without
+	 * actually disabling the clock from it's source.
+	 */
+	bool			card_clock_off;
 	unsigned long		private[0] ____cacheline_aligned;
 };
 
