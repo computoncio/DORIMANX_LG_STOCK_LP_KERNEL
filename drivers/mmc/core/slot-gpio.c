@@ -25,8 +25,8 @@ struct mmc_gpio {
 	int ro_gpio;
 	int cd_gpio;
 	char *ro_label;
-	char cd_label[0];
 	bool status;
+	char cd_label[0]; /* Must be last entry */
 };
 
 #ifdef CONFIG_MACH_LGE
