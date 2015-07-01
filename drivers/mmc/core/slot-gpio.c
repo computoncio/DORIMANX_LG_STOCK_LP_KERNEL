@@ -225,12 +225,6 @@ int mmc_gpio_request_cd(struct mmc_host *host, unsigned int gpio)
 		 */
 		return ret;
 
-	ret = mmc_cd_get_status(host);
-	if (ret < 0)
-		goto eirqreq;
-
-	ctx->status = ret;
-
 	/*
 	 * Even if gpio_to_irq() returns a valid IRQ number, the platform might
 	 * still prefer to poll, e.g., because that IRQ number is already used
