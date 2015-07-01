@@ -206,7 +206,7 @@ int mmc_gpio_request_cd(struct mmc_host *host, unsigned int gpio)
 	ctx->cd_gpio = gpio;
 	host->slot.cd_irq = irq;
 
-	ret = mmc_gpio_get_status(host);
+	ret = mmc_cd_get_status(host);
 	if (ret < 0)
 		return ret;
 
