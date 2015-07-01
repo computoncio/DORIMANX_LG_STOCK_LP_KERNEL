@@ -2566,7 +2566,7 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *rqc)
 	struct mmc_queue_req *mq_rq;
 	struct request *req = rqc;
 	struct mmc_async_req *areq;
-	const u8 packed_num = 2;
+	const u8 packed_nr = 2;
 	u8 reqs = 0;
 
 	if (!rqc && !mq->mqrq_prev->req)
@@ -2580,23 +2580,24 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *rqc)
 
 	do {
 		if (rqc) {
-			if (reqs >= packed_num) {
-				mmc_blk_packed_hdr_wrq_prep(mq->mqrq_cur,
-						card, mq);
-			} else {
-				/*
-			 	* When 4KB native sector is enabled, only 8 blocks
-			 	* multiple read or write is allowed
-			 	*/
-				if ((brq->data.blocks & 0x07) &&
-			    			(card->ext_csd.data_sector_size == 4096)) {
-					pr_err("%s: Transfer size is not 4KB sector size aligned\n",
-						req->rq_disk->disk_name);
-					goto cmd_abort;
-				}
-				mmc_blk_rw_rq_prep(mq->mqrq_cur, card, 0, mq);
-				areq = &mq->mqrq_cur->mmc_active;
+			/*
+			 * When 4KB native sector is enabled, only 8 blocks
+			 * multiple read or write is allowed
+			 */
+			if ((brq->data.blocks & 0x07) &&
+			    (card->ext_csd.data_sector_size == 4096)) {
+				pr_err("%s: Transfer size is not 4KB sector size aligned\n",
+					req->rq_disk->disk_name);
+				mq_rq = mq->mqrq_cur;
+				goto cmd_abort;
 			}
+
+			if (reqs >= packed_nr)
+				mmc_blk_packed_hdr_wrq_prep(mq->mqrq_cur,
+							    card, mq);
+			else
+				mmc_blk_rw_rq_prep(mq->mqrq_cur, card, 0, mq);
+			areq = &mq->mqrq_cur->mmc_active;
 		} else
 			areq = NULL;
 		areq = mmc_start_req(card->host, areq, (int *) &status);
