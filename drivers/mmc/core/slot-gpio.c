@@ -22,11 +22,11 @@
 #endif
 
 struct mmc_gpio {
-	bool status;
 	int ro_gpio;
 	int cd_gpio;
 	char *ro_label;
 	char cd_label[0];
+	bool status;
 };
 
 #ifdef CONFIG_MACH_LGE
@@ -40,7 +40,7 @@ static int mmc_cd_get_status(struct mmc_host *host)
 #endif
 {
 	int ret = -ENOSYS;
-	struct mmc_gpio *ctx = host->hotplug.handler_priv;
+	struct mmc_gpio *ctx = host->slot.handler_priv;
 
 	if (!ctx || !gpio_is_valid(ctx->cd_gpio))
 		goto out;
@@ -53,9 +53,13 @@ out:
 
 static irqreturn_t mmc_gpio_cd_irqt(int irq, void *dev_id)
 {
+	/* Schedule a card detection after a debounce timeout */
 	struct mmc_host *host = dev_id;
-	struct mmc_gpio *ctx = host->hotplug.handler_priv;
+	struct mmc_gpio *ctx = host->slot.handler_priv;
 	int status;
+
+	if (host->ops->card_event)
+		host->ops->card_event(host);
 
 	status = mmc_cd_get_status(host);
 	if (unlikely(status < 0))
@@ -69,11 +73,6 @@ static irqreturn_t mmc_gpio_cd_irqt(int irq, void *dev_id)
 		ctx->status = status;
 
 		/* Schedule a card detection after a debounce timeout */
-		struct mmc_host *host = dev_id;
-
-		if (host->ops->card_event)
-			host->ops->card_event(host);
-
 		#ifdef CONFIG_MACH_LGE
 		/* LGE_CHANGE
 		 * Reduce debounce time to make it more sensitive
@@ -232,6 +231,15 @@ int mmc_gpio_request_cd(struct mmc_host *host, unsigned int gpio)
 	if (irq >= 0 && host->caps & MMC_CAP_NEEDS_POLL)
 		irq = -EINVAL;
 
+	ctx->cd_gpio = gpio;
+	host->slot.cd_irq = irq;
+
+	ret = mmc_gpio_get_status(host);
+	if (ret < 0)
+		return ret;
+
+	ctx->status = ret;
+
 	if (irq >= 0) {
 		ret = devm_request_threaded_irq(&host->class_dev, irq,
 			NULL, mmc_gpio_cd_irqt,
@@ -241,12 +249,8 @@ int mmc_gpio_request_cd(struct mmc_host *host, unsigned int gpio)
 			irq = ret;
 	}
 
-	host->slot.cd_irq = irq;
-
 	if (irq < 0)
 		host->caps |= MMC_CAP_NEEDS_POLL;
-
-	ctx->cd_gpio = gpio;
 
 	return 0;
 }
