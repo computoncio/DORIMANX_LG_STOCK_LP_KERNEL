@@ -302,9 +302,6 @@ struct mmc_host {
 #define MMC_CAP_UHS_SDR50	(1 << 17)	/* Host supports UHS SDR50 mode */
 #define MMC_CAP_UHS_SDR104	(1 << 18)	/* Host supports UHS SDR104 mode */
 #define MMC_CAP_UHS_DDR50	(1 << 19)	/* Host supports UHS DDR50 mode */
-#define MMC_CAP_SET_XPC_330	(1 << 20)	/* Host supports >150mA current at 3.3V */
-#define MMC_CAP_SET_XPC_300	(1 << 21)	/* Host supports >150mA current at 3.0V */
-#define MMC_CAP_SET_XPC_180	(1 << 22)	/* Host supports >150mA current at 1.8V */
 #define MMC_CAP_DRIVER_TYPE_A	(1 << 23)	/* Host supports SD Driver Type A (eMMC Type 1) */
 #define MMC_CAP_DRIVER_TYPE_C	(1 << 24)	/* Host supports SD Driver Type C (eMMC Type 2) */
 #define MMC_CAP_DRIVER_TYPE_D	(1 << 25)	/* Host supports SD Driver Type D (eMMC Type 3) */

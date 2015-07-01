@@ -2245,19 +2245,6 @@ static irqreturn_t sdhci_msm_pwr_irq(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
-/* This function returns the max. current supported by VDD rail in mA */
-static unsigned int sdhci_msm_get_vreg_vdd_max_current(struct sdhci_msm_host
-						       *host)
-{
-	struct sdhci_msm_slot_reg_data *curr_slot = host->pdata->vreg_data;
-	if (!curr_slot)
-		return 0;
-	if (curr_slot->vdd_data)
-		return curr_slot->vdd_data->hpm_uA / 1000;
-	else
-		return 0;
-}
-
 static ssize_t
 show_polling(struct device *dev, struct device_attribute *attr, char *buf)
 {
@@ -2897,8 +2884,8 @@ static struct sdhci_ops sdhci_msm_ops = {
 	.get_max_clock = sdhci_msm_get_max_clock,
 	.disable_data_xfer = sdhci_msm_disable_data_xfer,
 	.dump_vendor_regs = sdhci_msm_dump_vendor_regs,
-	.enable_controller_clock = sdhci_msm_enable_controller_clock,
 	.config_auto_tuning_cmd = sdhci_msm_config_auto_tuning_cmd,
+	.enable_controller_clock = sdhci_msm_enable_controller_clock,
 };
 
 static int sdhci_msm_cfg_mpm_pin_wakeup(struct sdhci_host *host, unsigned mode)
@@ -2984,7 +2971,6 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 	struct sdhci_msm_host *msm_host;
 	struct resource *core_memres = NULL;
 	int ret = 0, dead = 0;
-	u32 vdd_max_current;
 	u16 host_version;
 	u32 pwr, irq_status, irq_ctl;
 	unsigned long flags;
@@ -3182,9 +3168,9 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 	 */
 	host->quirks |= SDHCI_QUIRK_BROKEN_CARD_DETECTION;
 	host->quirks |= SDHCI_QUIRK_SINGLE_POWER_WRITE;
-	host->quirks2 |= SDHCI_QUIRK2_IGNORE_CMDCRC_FOR_TUNING;
 	host->quirks |= SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN;
 	host->quirks2 |= SDHCI_QUIRK2_ALWAYS_USE_BASE_CLOCK;
+	host->quirks2 |= SDHCI_QUIRK2_IGNORE_CMDCRC_FOR_TUNING;
 	host->quirks2 |= SDHCI_QUIRK2_USE_MAX_DISCARD_SIZE;
 	host->quirks2 |= SDHCI_QUIRK2_IGNORE_DATATOUT_FOR_R1BCMD;
 	host->quirks2 |= SDHCI_QUIRK2_BROKEN_PRESET_VALUE;
@@ -3238,22 +3224,6 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 	/* Set host capabilities */
 	msm_host->mmc->caps |= msm_host->pdata->mmc_bus_width;
 	msm_host->mmc->caps |= msm_host->pdata->caps;
-
-	vdd_max_current = sdhci_msm_get_vreg_vdd_max_current(msm_host);
-	if (vdd_max_current >= 800)
-		msm_host->mmc->caps |= MMC_CAP_MAX_CURRENT_800;
-	else if (vdd_max_current >= 600)
-		msm_host->mmc->caps |= MMC_CAP_MAX_CURRENT_600;
-	else if (vdd_max_current >= 400)
-		msm_host->mmc->caps |= MMC_CAP_MAX_CURRENT_400;
-	else
-		msm_host->mmc->caps |= MMC_CAP_MAX_CURRENT_200;
-
-	if (vdd_max_current > 150)
-		msm_host->mmc->caps |= MMC_CAP_SET_XPC_180 |
-					MMC_CAP_SET_XPC_300|
-					MMC_CAP_SET_XPC_330;
-
 	msm_host->mmc->caps2 |= msm_host->pdata->caps2;
 	msm_host->mmc->caps2 |= MMC_CAP2_CORE_RUNTIME_PM;
 	msm_host->mmc->caps2 |= MMC_CAP2_PACKED_WR;
@@ -3265,6 +3235,7 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 	msm_host->mmc->caps2 |= MMC_CAP2_POWEROFF_NOTIFY;
 	msm_host->mmc->caps2 |= MMC_CAP2_CLK_SCALE;
 	msm_host->mmc->caps2 |= MMC_CAP2_ASYNC_SDIO_IRQ_4BIT_MODE;
+	msm_host->mmc->pm_caps |= MMC_PM_KEEP_POWER | MMC_PM_WAKE_SDIO_IRQ;
 	msm_host->mmc->caps2 |= MMC_CAP2_CORE_PM;
 #ifdef CONFIG_MACH_LGE
 #if defined (CONFIG_LGE_MMC_BKOPS_ENABLE) && defined(CONFIG_MMC_SDHCI_MSM)
@@ -3276,7 +3247,6 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 	msm_host->mmc->caps2 |= MMC_CAP2_INIT_BKOPS;
 #endif
 #endif
-	msm_host->mmc->pm_caps |= MMC_PM_KEEP_POWER | MMC_PM_WAKE_SDIO_IRQ;
 
 	populate_hpi_mode(pdev, msm_host);
 

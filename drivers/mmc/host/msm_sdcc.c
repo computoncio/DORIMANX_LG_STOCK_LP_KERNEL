@@ -2612,6 +2612,20 @@ out:
 	return rc;
 }
 
+/* This function returns the max. current supported by VDD rail in mA */
+static unsigned int msmsdcc_get_vreg_vdd_max_current(struct msmsdcc_host *host)
+{
+	struct msm_mmc_slot_reg_data *curr_slot = host->plat->vreg_data;
+
+	if (!curr_slot)
+		return 0;
+
+	if (curr_slot->vdd_data)
+		return curr_slot->vdd_data->hpm_uA / 1000;
+	else
+		return 0;
+}
+
 /*
  * Reset vreg by ensuring it is off during probe. A call
  * to enable vreg is needed to balance disable vreg
@@ -5794,7 +5808,7 @@ static struct mmc_platform_data *msmsdcc_populate_pdata(struct device *dev)
 	int i, ret;
 	struct mmc_platform_data *pdata;
 	struct device_node *np = dev->of_node;
-	u32 bus_width = 0, current_limit = 0;
+	u32 bus_width = 0;
 	u32 *clk_table = NULL, *sup_voltages = NULL;
 	int clk_table_len, sup_volt_len, len;
 
@@ -5892,18 +5906,6 @@ static struct mmc_platform_data *msmsdcc_populate_pdata(struct device *dev)
 						| MMC_CAP_UHS_DDR50;
 	}
 
-	of_property_read_u32(np, "qcom,current-limit", &current_limit);
-	if (current_limit == 800)
-		pdata->uhs_caps |= MMC_CAP_MAX_CURRENT_800;
-	else if (current_limit == 600)
-		pdata->uhs_caps |= MMC_CAP_MAX_CURRENT_600;
-	else if (current_limit == 400)
-		pdata->uhs_caps |= MMC_CAP_MAX_CURRENT_400;
-	else if (current_limit == 200)
-		pdata->uhs_caps |= MMC_CAP_MAX_CURRENT_200;
-
-	if (of_get_property(np, "qcom,xpc", NULL))
-		pdata->xpc_cap = true;
 	if (of_get_property(np, "qcom,nonremovable", NULL))
 		pdata->nonremovable = true;
 	if (of_get_property(np, "qcom,disable-cmd23", NULL))
@@ -6197,14 +6199,10 @@ msmsdcc_probe(struct platform_device *pdev)
 
 	mmc->caps |= plat->uhs_caps;
 	mmc->caps2 |= plat->uhs_caps2;
-	/*
-	 * XPC controls the maximum current in the default speed mode of SDXC
-	 * card. XPC=0 means 100mA (max.) but speed class is not supported.
-	 * XPC=1 means 150mA (max.) and speed class is supported.
-	 */
-	if (plat->xpc_cap)
-		mmc->caps |= (MMC_CAP_SET_XPC_330 | MMC_CAP_SET_XPC_300 |
-				MMC_CAP_SET_XPC_180);
+
+	mmc->max_current_180 = msmsdcc_get_vreg_vdd_max_current(host);
+	mmc->max_current_300 = msmsdcc_get_vreg_vdd_max_current(host);
+	mmc->max_current_330 = msmsdcc_get_vreg_vdd_max_current(host);
 
 	mmc->caps2 |= MMC_CAP2_PACKED_WR;
 	mmc->caps2 |= MMC_CAP2_PACKED_WR_CONTROL;
