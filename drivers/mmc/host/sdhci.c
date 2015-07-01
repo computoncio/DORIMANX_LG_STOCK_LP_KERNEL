@@ -28,6 +28,8 @@
 #include <linux/mmc/mmc.h>
 #include <linux/mmc/host.h>
 #include <linux/mmc/card.h>
+#include <linux/mmc/slot-gpio.h>
+#include <linux/mmc/sdio.h>
 
 #include "sdhci.h"
 
