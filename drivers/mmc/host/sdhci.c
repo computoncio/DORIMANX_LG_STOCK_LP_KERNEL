@@ -1691,7 +1691,7 @@ static void sdhci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 		 */
 		{
 			if (mmc->index == MMC_HOST_DRIVER_INDEX_MMC1)
-				present = mmc_cd_get_status(mmc);
+				present = mmc_gpio_get_status(mmc);
 			else
 				present = 1;
 		}

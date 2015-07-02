@@ -231,9 +231,9 @@ enum dev_state {
 
  #ifdef CONFIG_MACH_LGE
 /* LGE_CHANGE, 2014/01/16, B2-BSP-FS@lge.com
- * extern int mmc_cd_get_status( )
+ * extern int mmc_gpio_get_status( )
  */
-extern int mmc_cd_get_status(struct mmc_host *host);
+int mmc_gpio_get_status(struct mmc_host *host);
 #endif
 
 #ifdef CONFIG_MACH_LGE

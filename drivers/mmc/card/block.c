@@ -1211,7 +1211,7 @@ static int mmc_blk_cmd_recovery(struct mmc_card *card, struct request *req,
 		prev_cmd_status_valid = false;
 		#ifdef CONFIG_MACH_LGE
 		pr_err("[LGE][MMC]%s: error %d sending status command, %sing, cd-gpio:%d\n",
-		       req->rq_disk->disk_name, err, retry ? "retry" : "abort", mmc_cd_get_status(card->host));
+		       req->rq_disk->disk_name, err, retry ? "retry" : "abort", mmc_gpio_get_status(card->host));
 		#else
 		pr_err("%s: error %d sending status command, %sing\n",
 		       req->rq_disk->disk_name, err, retry ? "retry" : "abort");
@@ -1573,7 +1573,7 @@ static int mmc_blk_err_check(struct mmc_card *card,
 	 * When uSD is not inserted, return proper error-value.
 	 * 2014-01-16, B2-BSP-FS@lge.com
 	 */
-	if (mmc_card_sd(card) && !mmc_cd_get_status(card->host)) {
+	if (mmc_card_sd(card) && !mmc_gpio_get_status(card->host)) {
         pr_info("[LGE][MMC][%-18s( )] sd-no-exist, skip next\n", __func__);
 		return MMC_BLK_NOMEDIUM;
 	}

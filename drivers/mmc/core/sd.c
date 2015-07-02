@@ -1052,7 +1052,7 @@ static int mmc_sd_init_card(struct mmc_host *host, u32 ocr,
 	 * When uSD is not inserted, return proper error-value.
 	 * 2014/01/16, B2-BSP-FS@lge.com
 	 */
-	if (!mmc_cd_get_status(host)) {
+	if (!mmc_gpio_get_status(host)) {
         pr_info("[LGE][MMC][%-18s( )] sd-no-exist. skip next\n", __func__);
 		err = -ENOMEDIUM;
 		return err;

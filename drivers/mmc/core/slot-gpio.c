@@ -34,9 +34,9 @@ struct mmc_gpio {
  * Change it global-function for usage from others.
  * 2014-01-16, B2-BSP-FS@lge.com
  */
-int mmc_cd_get_status(struct mmc_host *host)
+int mmc_gpio_get_status(struct mmc_host *host)
 #else
-static int mmc_cd_get_status(struct mmc_host *host)
+static int mmc_gpio_get_status(struct mmc_host *host)
 #endif
 {
 	int ret = -ENOSYS;
@@ -69,7 +69,7 @@ static irqreturn_t mmc_gpio_cd_irqt(int irq, void *dev_id)
 	if (host->ops->card_event)
 		host->ops->card_event(host);
 
-	status = mmc_cd_get_status(host);
+	status = mmc_gpio_get_status(host);
 	if (unlikely(status < 0))
 		goto out;
 
@@ -92,6 +92,7 @@ static irqreturn_t mmc_gpio_cd_irqt(int irq, void *dev_id)
 		#endif
 	}
 out:
+
 	return IRQ_HANDLED;
 }
 
@@ -236,7 +237,7 @@ int mmc_gpio_request_cd(struct mmc_host *host, unsigned int gpio)
 	ctx->cd_gpio = gpio;
 	host->slot.cd_irq = irq;
 
-	ret = mmc_cd_get_status(host);
+	ret = mmc_gpio_get_status(host);
 	if (ret < 0)
 		return ret;
 
