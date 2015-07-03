@@ -107,7 +107,6 @@ static int mmc_host_suspend(struct device *dev)
 
 	if (!mmc_use_core_pm(host))
 		return 0;
-
 	spin_lock_irqsave(&host->clk_lock, flags);
 	/*
 	 * let the driver know that suspend is in progress and must
@@ -346,7 +345,7 @@ void mmc_host_clk_release(struct mmc_host *host)
 	if (mmc_host_may_gate_card(host->card) &&
 	    !host->clk_requests)
 		schedule_delayed_work(&host->clk_gate_work,
-				msecs_to_jiffies(host->clkgate_delay));
+				      msecs_to_jiffies(host->clkgate_delay));
 	spin_unlock_irqrestore(&host->clk_lock, flags);
 }
 

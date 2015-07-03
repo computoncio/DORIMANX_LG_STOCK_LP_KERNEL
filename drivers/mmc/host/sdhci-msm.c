@@ -37,9 +37,6 @@
 #include <linux/pm_runtime.h>
 #include <linux/mmc/slot-gpio.h>
 #include <linux/dma-mapping.h>
-#include <mach/gpio.h>
-#include <mach/msm_bus.h>
-#include <mach/mpm.h>
 #include <linux/iopoll.h>
 #include <linux/pinctrl/consumer.h>
 
@@ -51,6 +48,10 @@
  */
 #include <linux/debugfs.h>
 #endif
+#include <mach/mpm.h>
+#include <mach/msm_bus.h>
+#include <mach/gpio.h>
+
 #include "sdhci-pltfm.h"
 
 enum sdc_mpm_pin_state {
@@ -3017,17 +3018,17 @@ void sdhci_msm_dump_vendor_regs(struct sdhci_host *host)
 
 	pr_info("----------- VENDOR REGISTER DUMP -----------\n");
 	pr_info("Data cnt: 0x%08x | Fifo cnt: 0x%08x | Int sts: 0x%08x\n",
-			readl_relaxed(msm_host->core_mem + CORE_MCI_DATA_CNT),
-			readl_relaxed(msm_host->core_mem + CORE_MCI_FIFO_CNT),
-			readl_relaxed(msm_host->core_mem + CORE_MCI_STATUS));
+		readl_relaxed(msm_host->core_mem + CORE_MCI_DATA_CNT),
+		readl_relaxed(msm_host->core_mem + CORE_MCI_FIFO_CNT),
+		readl_relaxed(msm_host->core_mem + CORE_MCI_STATUS));
 	pr_info("DLL cfg:  0x%08x | DLL sts:  0x%08x | SDCC ver: 0x%08x\n",
-			readl_relaxed(host->ioaddr + CORE_DLL_CONFIG),
-			readl_relaxed(host->ioaddr + CORE_DLL_STATUS),
-			readl_relaxed(msm_host->core_mem + CORE_MCI_VERSION));
+		readl_relaxed(host->ioaddr + CORE_DLL_CONFIG),
+		readl_relaxed(host->ioaddr + CORE_DLL_STATUS),
+		readl_relaxed(msm_host->core_mem + CORE_MCI_VERSION));
 	pr_info("Vndr func: 0x%08x | Vndr adma err : addr0: 0x%08x addr1: 0x%08x\n",
-			readl_relaxed(host->ioaddr + CORE_VENDOR_SPEC),
-			readl_relaxed(host->ioaddr + CORE_VENDOR_SPEC_ADMA_ERR_ADDR0),
-			readl_relaxed(host->ioaddr + CORE_VENDOR_SPEC_ADMA_ERR_ADDR1));
+		readl_relaxed(host->ioaddr + CORE_VENDOR_SPEC),
+		readl_relaxed(host->ioaddr + CORE_VENDOR_SPEC_ADMA_ERR_ADDR0),
+		readl_relaxed(host->ioaddr + CORE_VENDOR_SPEC_ADMA_ERR_ADDR1));
 
 	/*
 	 * tbsel indicates [2:0] bits and tbsel2 indicates [7:4] bits
@@ -3043,11 +3044,11 @@ void sdhci_msm_dump_vendor_regs(struct sdhci_host *host)
 			if (index >= MAX_TEST_BUS)
 				break;
 			test_bus_val = (tbsel2 << CORE_TESTBUS_SEL2_BIT) |
-				tbsel | CORE_TESTBUS_ENA;
+					tbsel | CORE_TESTBUS_ENA;
 			writel_relaxed(test_bus_val,
-					msm_host->core_mem + CORE_TESTBUS_CONFIG);
+				msm_host->core_mem + CORE_TESTBUS_CONFIG);
 			debug_reg[index++] = readl_relaxed(msm_host->core_mem +
-					CORE_SDCC_DEBUG_REG);
+							CORE_SDCC_DEBUG_REG);
 		}
 	}
 	for (i = 0; i < MAX_TEST_BUS; i = i + 4)
@@ -3566,6 +3567,7 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 	/* Set host capabilities */
 	msm_host->mmc->caps |= msm_host->pdata->mmc_bus_width;
 	msm_host->mmc->caps |= msm_host->pdata->caps;
+
 	msm_host->mmc->caps2 |= msm_host->pdata->caps2;
 	msm_host->mmc->caps2 |= MMC_CAP2_CORE_RUNTIME_PM;
 	msm_host->mmc->caps2 |= MMC_CAP2_PACKED_WR;
@@ -3714,7 +3716,7 @@ static int sdhci_msm_probe(struct platform_device *pdev)
  * but, it doesn't operate in user image
  * 2014-03-19, B2-BSP-FS@lge.com
  */
-    msmsdhci_dbg_createhost(msm_host);
+	msmsdhci_dbg_createhost(msm_host);
 #endif
 	goto out;
 
