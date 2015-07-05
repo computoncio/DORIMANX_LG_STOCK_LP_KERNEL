@@ -1353,7 +1353,9 @@ static int mmc_select_hs400(struct mmc_card *card, u8 *ext_csd)
 	*/
 	if (card->cid.manfid == 17) {
 		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
-				EXT_CSD_HS_TIMING, 67, 0);
+				EXT_CSD_HS_TIMING, 67 |
+				(card->ext_csd.drv_type << 4),
+				0);
 	} else {
 		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
 				EXT_CSD_HS_TIMING,
@@ -2102,7 +2104,7 @@ static int mmc_resume(struct mmc_host *host)
 	BUG_ON(!host->card);
 
 	mmc_claim_host(host);
-	retries = 3;
+	retries = 6;
 	while (retries) {
 		err = mmc_init_card(host, host->ocr, host->card);
 
