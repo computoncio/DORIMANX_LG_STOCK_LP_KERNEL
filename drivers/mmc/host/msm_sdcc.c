@@ -3,7 +3,7 @@
  *
  *  Copyright (C) 2007 Google Inc,
  *  Copyright (C) 2003 Deep Blue Solutions, Ltd, All Rights Reserved.
- *  Copyright (c) 2009-2013, The Linux Foundation. All rights reserved.
+ *  Copyright (c) 2009-2014, The Linux Foundation. All rights reserved.
  *
  *
  * This program is free software; you can redistribute it and/or modify
@@ -3293,7 +3293,8 @@ static void msmsdcc_msm_bus_queue_work(struct msmsdcc_host *host)
 
 	spin_lock_irqsave(&host->lock, flags);
 	if (host->msm_bus_vote.min_bw_vote != host->msm_bus_vote.curr_vote)
-		schedule_delayed_work(&host->msm_bus_vote.vote_work,
+		queue_delayed_work(system_nrt_wq,
+				   &host->msm_bus_vote.vote_work,
 				   msecs_to_jiffies(MSM_MMC_BUS_VOTING_DELAY));
 	spin_unlock_irqrestore(&host->lock, flags);
 }

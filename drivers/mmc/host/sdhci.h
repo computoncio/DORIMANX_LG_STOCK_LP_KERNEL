@@ -312,7 +312,7 @@ struct sdhci_ops {
 	void	(*platform_resume)(struct sdhci_host *host);
 	void    (*adma_workaround)(struct sdhci_host *host, u32 intmask);
 	void	(*platform_init)(struct sdhci_host *host);
-	void	(*check_power_status)(struct sdhci_host *host, u32 req_type);
+	void    (*check_power_status)(struct sdhci_host *host, u32 req_type);
 #define REQ_BUS_OFF	(1 << 0)
 #define REQ_BUS_ON	(1 << 1)
 #define REQ_IO_LOW	(1 << 2)

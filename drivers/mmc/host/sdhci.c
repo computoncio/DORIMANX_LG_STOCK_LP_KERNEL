@@ -1668,6 +1668,7 @@ static void sdhci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 			mrq->data->error = -EIO;
 		mmc_request_done(host->mmc, mrq);
 		sdhci_runtime_pm_put(host);
+		tasklet_schedule(&host->finish_tasklet);
 		return;
 	}
 
@@ -1722,13 +1723,6 @@ static void sdhci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 	}
 
 	host->mrq = mrq;
-
-	/* If we're using a cd-gpio, testing the presence bit might fail. */
-	if (!present) {
-		int ret = mmc_gpio_get_cd(host->mmc);
-		if (ret > 0)
-			present = true;
-	}
 
 	if (!present || host->flags & SDHCI_DEVICE_DEAD) {
 		host->mrq->cmd->error = -ENOMEDIUM;

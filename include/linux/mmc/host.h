@@ -396,6 +396,7 @@ struct mmc_host {
 #endif
 
 	int			rescan_disable;	/* disable card detection */
+	int			rescan_entered;	/* used with nonremovable devices */
 
 	struct mmc_card		*card;		/* device attached to this host */
 
@@ -424,9 +425,7 @@ struct mmc_host {
 
 	mmc_pm_flag_t		pm_flags;	/* requested pm features */
 
-#ifdef CONFIG_LEDS_TRIGGERS
 	struct led_trigger	*led;		/* activity led */
-#endif
 
 #ifdef CONFIG_REGULATOR
 	bool			regulator_enabled; /* regulator state */
@@ -466,7 +465,6 @@ struct mmc_host {
 	} perf;
 	bool perf_enable;
 #endif
-	struct mmc_ios saved_ios;
 	struct {
 		unsigned long	busy_time_us;
 		unsigned long	window_time;
@@ -485,7 +483,6 @@ struct mmc_host {
 		enum mmc_load	state;
 	} clk_scaling;
 	enum dev_state dev_status;
-	bool			wakeup_on_idle;
 	/*
 	 * Set to 1 to just stop the SDCLK to the card without
 	 * actually disabling the clock from it's source.

@@ -34,9 +34,6 @@
 #define PACKED_HDR_RW_MASK 0x0000FF00
 #define PACKED_HDR_NUM_REQS_MASK 0x00FF0000
 #define PACKED_HDR_BITS_16_TO_29_SET 0x3FFF0000
-#define SECTOR_SIZE 512
-#define NUM_OF_SECTORS_PER_BIO		((BIO_U32_SIZE * 4) / SECTOR_SIZE)
-#define BIO_TO_SECTOR(x)		(x * NUM_OF_SECTORS_PER_BIO)
 /* the desired long test size to be read */
 #define LONG_READ_TEST_MAX_NUM_BYTES (50*1024*1024) /* 50MB */
 /* the minimum amount of requests that will be created */
@@ -64,7 +61,6 @@
 
 #define URGENT_DELAY_RANGE_MS 500
 
-#define SANITIZE_TEST_TIMEOUT 240000
 #define NEW_REQ_TEST_SLEEP_TIME 1
 #define NEW_REQ_TEST_NUM_BIOS 64
 #define TEST_REQUEST_NUM_OF_BIOS	3
@@ -140,8 +136,6 @@ enum mmc_block_test_testcases {
 	TEST_PACK_MIX_NO_PACKED_PACKED_NO_PACKED,
 	PACKING_CONTROL_MAX_TESTCASE = TEST_PACK_MIX_NO_PACKED_PACKED_NO_PACKED,
 
-	TEST_WRITE_DISCARD_SANITIZE_READ,
-
 	/* Start of bkops test group */
 	BKOPS_MIN_TESTCASE,
 	BKOPS_DELAYED_WORK_LEVEL_1 = BKOPS_MIN_TESTCASE,
@@ -182,7 +176,6 @@ struct mmc_block_test_debug {
 	struct dentry *send_invalid_packed_test;
 	struct dentry *random_test_seed;
 	struct dentry *packing_control_test;
-	struct dentry *discard_sanitize_test;
 	struct dentry *bkops_test;
 	struct dentry *long_sequential_read_test;
 	struct dentry *long_sequential_write_test;
@@ -295,7 +288,7 @@ static void test_invalid_packed_cmd(struct request_queue *q,
 				    struct mmc_queue_req *mqrq)
 {
 	struct mmc_queue *mq = q->queuedata;
-	u32 *packed_cmd_hdr = mqrq->packed_cmd_hdr;
+	u32 *packed_cmd_hdr = mqrq->packed->cmd_hdr;
 	struct request *req = mqrq->req;
 	struct request *second_rq;
 	struct test_request *test_rq;
@@ -417,7 +410,7 @@ static void test_invalid_packed_cmd(struct request_queue *q,
 	case TEST_CMD23_HDR_BLK_NOT_IN_COUNT:
 		pr_info("%s: CMD23 hdr not in block count", __func__);
 		brq->sbc.arg = MMC_CMD23_ARG_PACKED |
-		((rq_data_dir(req) == READ) ? 0 : mqrq->packed_blocks);
+		((rq_data_dir(req) == READ) ? 0 : mqrq->packed->blocks);
 		break;
 	default:
 		pr_err("%s: unexpected testcase %d",
@@ -476,9 +469,9 @@ static int test_err_check(struct mmc_card *card, struct mmc_async_req *areq)
 		 * Since in this testcase num_requests is always >= 2,
 		 * we can be sure that packed_fail_idx is always >= 1
 		 */
-		mq_rq->packed_fail_idx = (mbtd->num_requests / 2);
+		mq_rq->packed->idx_failure = (mbtd->num_requests / 2);
 		pr_info("%s: packed_fail_idx = %d"
-			, __func__, mq_rq->packed_fail_idx);
+			, __func__, mq_rq->packed->idx_failure);
 		mq->err_check_fn = NULL;
 		ret = MMC_BLK_PARTIAL;
 		break;
@@ -491,9 +484,9 @@ static int test_err_check(struct mmc_card *card, struct mmc_async_req *areq)
 			 * Since in this testcase num_requests is always >= 3,
 			 * we have that packed_fail_idx is always >= 1
 			 */
-			mq_rq->packed_fail_idx = (mbtd->num_requests / 2);
+			mq_rq->packed->idx_failure = (mbtd->num_requests / 2);
 			pr_info("%s: packed_fail_idx = %d"
-				, __func__, mq_rq->packed_fail_idx);
+				, __func__, mq_rq->packed->idx_failure);
 			ret = MMC_BLK_PARTIAL;
 			break;
 		}
@@ -510,12 +503,12 @@ static int test_err_check(struct mmc_card *card, struct mmc_async_req *areq)
 			ret = MMC_BLK_PARTIAL;
 			break;
 		}
-		mq_rq->packed_fail_idx = 1;
+		mq_rq->packed->idx_failure = 1;
 		ret = MMC_BLK_PARTIAL;
 		break;
 	case TEST_RET_PARTIAL_MAX_FAIL_IDX:
 		pr_info("%s: return partial max fail_idx", __func__);
-		mq_rq->packed_fail_idx = max_packed_reqs - 1;
+		mq_rq->packed->idx_failure = max_packed_reqs - 1;
 		mq->err_check_fn = NULL;
 		ret = MMC_BLK_PARTIAL;
 		break;
@@ -640,8 +633,6 @@ switch (td->test_info.testcase) {
 		return "\"packing control - mix: pack -> no pack -> pack\"";
 	case TEST_PACK_MIX_NO_PACKED_PACKED_NO_PACKED:
 		return "\"packing control - mix: no pack->pack->no pack\"";
-	case TEST_WRITE_DISCARD_SANITIZE_READ:
-		return "\"write, discard, sanitize\"";
 	case BKOPS_DELAYED_WORK_LEVEL_1:
 		return "\"delayed work BKOPS level 1\"";
 	case BKOPS_DELAYED_WORK_LEVEL_1_HPI:
@@ -1640,63 +1631,6 @@ static int validate_packed_commands_settings(void)
 	return 0;
 }
 
-static void pseudo_rnd_sector_and_size(unsigned int *seed,
-				       unsigned int min_start_sector,
-				       unsigned int *start_sector,
-				       unsigned int *num_of_bios)
-{
-	unsigned int max_sec = min_start_sector + TEST_MAX_SECTOR_RANGE;
-	do {
-		*start_sector = pseudo_random_seed(seed,
-						   1, max_sec);
-		*num_of_bios = pseudo_random_seed(seed,
-						  1, TEST_MAX_BIOS_PER_REQ);
-		if (!(*num_of_bios))
-			*num_of_bios = 1;
-	} while ((*start_sector < min_start_sector) ||
-		 (*start_sector + (*num_of_bios * BIO_U32_SIZE * 4)) > max_sec);
-}
-
-/* sanitize test functions */
-static int prepare_write_discard_sanitize_read(struct test_data *td)
-{
-	unsigned int start_sector;
-	unsigned int num_of_bios = 0;
-	static unsigned int total_bios;
-	unsigned int *num_bios_seed;
-	int i = 0;
-
-	if (mbtd->random_test_seed == 0) {
-		mbtd->random_test_seed =
-			(unsigned int)(get_jiffies_64() & 0xFFFF);
-		pr_info("%s: got seed from jiffies %d",
-			     __func__, mbtd->random_test_seed);
-	}
-	num_bios_seed = &mbtd->random_test_seed;
-
-	do {
-		pseudo_rnd_sector_and_size(num_bios_seed, td->start_sector,
-					   &start_sector, &num_of_bios);
-
-		/* DISCARD */
-		total_bios += num_of_bios;
-		pr_info("%s: discard req: id=%d, startSec=%d, NumBios=%d",
-		       __func__, td->unique_next_req_id, start_sector,
-			     num_of_bios);
-		test_iosched_add_unique_test_req(0, REQ_UNIQUE_DISCARD,
-				    start_sector, BIO_TO_SECTOR(num_of_bios),
-						 NULL);
-
-	} while (++i < (BLKDEV_MAX_RQ-10));
-
-	pr_info("%s: total discard bios = %d", __func__, total_bios);
-
-	pr_info("%s: add sanitize req", __func__);
-	test_iosched_add_unique_test_req(0, REQ_UNIQUE_SANITIZE, 0, 0, NULL);
-
-	return 0;
-}
-
 /*
  * Post test operations for BKOPs test
  * Disable the BKOPs statistics and clear the feature flags
@@ -2681,49 +2615,6 @@ const struct file_operations write_packing_control_test_ops = {
 	.read = write_packing_control_test_read,
 };
 
-static ssize_t write_discard_sanitize_test_write(struct file *file,
-				const char __user *buf,
-				size_t count,
-				loff_t *ppos)
-{
-	int ret = 0;
-	int i = 0;
-	int number = -1;
-
-	sscanf(buf, "%d", &number);
-	if (number <= 0)
-		number = 1;
-
-	pr_info("%s: -- write_discard_sanitize TEST --\n", __func__);
-
-	memset(&mbtd->test_info, 0, sizeof(struct test_info));
-
-	mbtd->test_group = TEST_GENERAL_GROUP;
-
-	mbtd->test_info.data = mbtd;
-	mbtd->test_info.prepare_test_fn = prepare_write_discard_sanitize_read;
-	mbtd->test_info.get_test_case_str_fn = get_test_case_str;
-	mbtd->test_info.timeout_msec = SANITIZE_TEST_TIMEOUT;
-
-	for (i = 0 ; i < number ; ++i) {
-		pr_info("%s: Cycle # %d / %d\n", __func__, i+1, number);
-		pr_info("%s: ===================", __func__);
-
-		mbtd->test_info.testcase = TEST_WRITE_DISCARD_SANITIZE_READ;
-		ret = test_iosched_start_test(&mbtd->test_info);
-
-		if (ret)
-			break;
-	}
-
-	return count;
-}
-
-const struct file_operations write_discard_sanitize_test_ops = {
-	.open = test_open,
-	.write = write_discard_sanitize_test_write,
-};
-
 static ssize_t bkops_test_write(struct file *file,
 				const char __user *buf,
 				size_t count,
@@ -3135,7 +3026,6 @@ static void mmc_block_test_debugfs_cleanup(void)
 	debugfs_remove(mbtd->debug.err_check_test);
 	debugfs_remove(mbtd->debug.send_invalid_packed_test);
 	debugfs_remove(mbtd->debug.packing_control_test);
-	debugfs_remove(mbtd->debug.discard_sanitize_test);
 	debugfs_remove(mbtd->debug.bkops_test);
 	debugfs_remove(mbtd->debug.long_sequential_read_test);
 	debugfs_remove(mbtd->debug.long_sequential_write_test);
@@ -3200,17 +3090,6 @@ static int mmc_block_test_debugfs_init(void)
 
 	if (!mbtd->debug.packing_control_test)
 		goto err_nomem;
-
-	mbtd->debug.discard_sanitize_test =
-		debugfs_create_file("write_discard_sanitize_test",
-				    S_IRUGO | S_IWUGO,
-				    tests_root,
-				    NULL,
-				    &write_discard_sanitize_test_ops);
-	if (!mbtd->debug.discard_sanitize_test) {
-		mmc_block_test_debugfs_cleanup();
-		return -ENOMEM;
-	}
 
 	mbtd->debug.bkops_test =
 		debugfs_create_file("bkops_test",

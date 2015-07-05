@@ -104,7 +104,7 @@ struct mmc_ext_csd {
 	unsigned int            data_tag_unit_size;     /* DATA TAG UNIT size */
 	unsigned int		boot_ro_lock;		/* ro lock support */
 	bool			boot_ro_lockable;
-	u8			raw_exception_status;	/* 53 */
+	u8			raw_exception_status;	/* 54 */
 	u8			raw_partition_support;	/* 160 */
 	u8			raw_rpmb_size_mult;	/* 168 */
 	u8			raw_erased_mem_count;	/* 181 */
@@ -218,20 +218,6 @@ struct mmc_queue;
 
 #define SDIO_MAX_FUNCS		7
 
-enum mmc_packed_stop_reasons {
-	EXCEEDS_SEGMENTS = 0,
-	EXCEEDS_SECTORS,
-	WRONG_DATA_DIR,
-	FLUSH_OR_DISCARD,
-	EMPTY_QUEUE,
-	REL_WRITE,
-	THRESHOLD,
-	LARGE_SEC_ALIGN,
-	RANDOM,
-	FUA,
-	MAX_REASONS,
-};
-
 enum mmc_blk_status {
 	MMC_BLK_SUCCESS = 0,
 	MMC_BLK_PARTIAL,
@@ -245,6 +231,20 @@ enum mmc_blk_status {
 	MMC_BLK_URGENT,
 	MMC_BLK_URGENT_DONE,
 	MMC_BLK_NO_REQ_TO_STOP,
+};
+
+enum mmc_packed_stop_reasons {
+	EXCEEDS_SEGMENTS = 0,
+	EXCEEDS_SECTORS,
+	WRONG_DATA_DIR,
+	FLUSH_OR_DISCARD,
+	EMPTY_QUEUE,
+	REL_WRITE,
+	THRESHOLD,
+	LARGE_SEC_ALIGN,
+	RANDOM,
+	FUA,
+	MAX_REASONS,
 };
 
 struct mmc_wr_pack_stats {
@@ -443,7 +443,7 @@ static inline void mmc_part_add(struct mmc_card *card, unsigned int size,
 	card->nr_parts++;
 }
 
-static inline bool mmc_large_sec(struct mmc_card *card)
+static inline bool mmc_large_sector(struct mmc_card *card)
 {
 	return card->ext_csd.data_sector_size == 4096;
 }

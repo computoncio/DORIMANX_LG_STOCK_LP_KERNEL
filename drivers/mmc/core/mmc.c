@@ -78,9 +78,6 @@ static const struct mmc_fixup mmc_fixups[] = {
 	MMC_FIXUP("H8G2d", CID_MANFID_HYNIX, CID_OEMID_ANY, add_quirk_mmc,
 		  MMC_QUIRK_CACHE_DISABLE),
 
-	MMC_FIXUP("MMC16G", CID_MANFID_KINGSTON, CID_OEMID_ANY, add_quirk_mmc,
-		  MMC_QUIRK_CACHE_DISABLE),
-
 	END_FIXUP
 };
 
@@ -682,13 +679,9 @@ static int mmc_compare_ext_csds(struct mmc_card *card, unsigned bus_width)
 		*/
 		pr_err("%s: %s: 0x%x, 0x%x\n", mmc_hostname(card->host), __func__, err, bw_ext_csd ? *bw_ext_csd : 0x0);
 		#endif
-		if (bus_width != MMC_BUS_WIDTH_1)
-			err = -EINVAL;
+		err = -EINVAL;
 		goto out;
 	}
-
-	if (bus_width == MMC_BUS_WIDTH_1)
-		goto out;
 
 	/* only compare read only fields */
 	err = !((card->ext_csd.raw_partition_support ==
@@ -890,9 +883,9 @@ static int mmc_select_powerclass(struct mmc_card *card,
 				EXT_CSD_PWR_CL_52_360 :
 				EXT_CSD_PWR_CL_DDR_52_360;
 		else if (host->ios.clock <= 200000000)
-			index = (bus_width == EXT_CSD_DDR_BUS_WIDTH_8) ?
-				EXT_CSD_PWR_CL_DDR_200_360 :
-				EXT_CSD_PWR_CL_200_360;
+			index = (bus_width <= EXT_CSD_BUS_WIDTH_8) ?
+				EXT_CSD_PWR_CL_200_360 :
+				EXT_CSD_PWR_CL_DDR_200_360;
 		break;
 	default:
 		#ifdef CONFIG_MACH_LGE
@@ -1863,16 +1856,14 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 			card->ext_csd.cache_ctrl = 1;
 		}
 	}
-	if (card->quirks & MMC_QUIRK_CACHE_DISABLE) {
-		pr_warn("%s: This is Hynix card, cache disabled!\n",
-				mmc_hostname(card->host));
-		card->ext_csd.cache_ctrl = 0;
-	}
 
-	if ((host->caps2 & MMC_CAP2_PACKED_WR &&
-			card->ext_csd.max_packed_writes > 0) ||
-	    (host->caps2 & MMC_CAP2_PACKED_RD &&
-			card->ext_csd.max_packed_reads > 0)) {
+	/*
+	 * The mandatory minimum values are defined for packed command.
+	 * read: 5, write: 3
+	 */
+	if (card->ext_csd.max_packed_writes >= 3 &&
+	    card->ext_csd.max_packed_reads >= 5 &&
+	    host->caps2 & MMC_CAP2_PACKED_CMD) {
 		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
 				EXT_CSD_EXP_EVENTS_CTRL,
 				EXT_CSD_PACKED_EVENT_EN,
