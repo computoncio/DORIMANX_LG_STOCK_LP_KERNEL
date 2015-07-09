@@ -831,6 +831,7 @@ int mmc_sd_get_cid(struct mmc_host *host, u32 ocr, u32 *cid, u32 *rocr)
 
 try_again:
 	if (!retries) {
+		mmc_power_cycle(host);
 		ocr &= ~SD_OCR_S18R;
 		pr_warning("%s: Skipping voltage switch\n",
 			mmc_hostname(host));
